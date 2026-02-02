@@ -66,9 +66,12 @@ export default function DashboardPage() {
 
       if (historyData.error) {
         console.error("History error:", historyData.error);
+        setError(`Match history: ${historyData.error}`);
       }
 
-      setMatches(historyData.matches || []);
+      const matchList = historyData.matches || [];
+      console.log(`Loaded ${matchList.length} matches for player ${playerId}`);
+      setMatches(matchList);
       setDoublesRatingHistory(doublesRatingData?.result?.ratingHistory || []);
       setSinglesRatingHistory(singlesRatingData?.result?.ratingHistory || []);
     } catch (err) {

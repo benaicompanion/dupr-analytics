@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "@/lib/auth";
 import { getAllMatchHistory } from "@/lib/dupr-api";
 
+export const maxDuration = 30;
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

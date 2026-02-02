@@ -67,7 +67,7 @@ export async function getMatchHistory(
 export async function getAllMatchHistory(token: string, playerId: number) {
   const allHits: unknown[] = [];
   let offset = 0;
-  const limit = 100;
+  const limit = 200; // Fetch more per page to reduce round trips
   let total = Infinity;
 
   while (offset < total) {
@@ -77,9 +77,9 @@ export async function getAllMatchHistory(token: string, playerId: number) {
     allHits.push(...hits);
     offset += limit;
 
-    // Rate limiting - small delay between requests
+    // Small delay between requests if more pages needed
     if (offset < total) {
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
 
