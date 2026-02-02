@@ -126,20 +126,54 @@ export function InsightsPanel({
                 </p>
 
                 {/* Mini sparkline of recent changes */}
-                <div className="flex items-end gap-[2px] h-8">
-                  {volatility.changes.slice(-20).map((c, i) => {
-                    const maxAbs = Math.max(...volatility.changes.slice(-20).map(Math.abs), 0.01);
-                    const height = Math.max(2, (Math.abs(c) / maxAbs) * 28);
-                    return (
-                      <div
-                        key={i}
-                        className={`flex-1 rounded-sm ${c >= 0 ? "bg-green-500" : "bg-red-500"}`}
-                        style={{ height: `${height}px` }}
-                        title={`${c >= 0 ? "+" : ""}${c.toFixed(3)}`}
-                      />
-                    );
-                  })}
-                </div>
+                {(() => {
+                  const recent20 = volatility.changes.slice(-20);
+                  const maxAbs = Math.max(...recent20.map(Math.abs), 0.01);
+                  const chartHeight = 48;
+                  return (
+                    <div className="relative">
+                      <div className="flex items-center gap-0">
+                        {/* Y-axis labels */}
+                        <div className="flex flex-col justify-between text-[9px] text-muted-foreground font-mono pr-1 shrink-0" style={{ height: `${chartHeight}px` }}>
+                          <span>+{maxAbs.toFixed(2)}</span>
+                          <span className="text-center">0</span>
+                          <span>−{maxAbs.toFixed(2)}</span>
+                        </div>
+                        {/* Bars - centered on zero line */}
+                        <div className="flex-1 relative" style={{ height: `${chartHeight}px` }}>
+                          {/* Zero line */}
+                          <div className="absolute left-0 right-0 border-t border-muted-foreground/30" style={{ top: "50%" }} />
+                          <div className="flex items-center gap-[2px] h-full">
+                            {recent20.map((c, i) => {
+                              const barHeight = Math.max(2, (Math.abs(c) / maxAbs) * (chartHeight / 2 - 2));
+                              const isPositive = c >= 0;
+                              return (
+                                <div
+                                  key={i}
+                                  className="flex-1 relative h-full group"
+                                >
+                                  <div
+                                    className={`absolute left-0 right-0 rounded-sm ${isPositive ? "bg-green-500" : "bg-red-500"}`}
+                                    style={isPositive
+                                      ? { bottom: "50%", height: `${barHeight}px` }
+                                      : { top: "50%", height: `${barHeight}px` }
+                                    }
+                                  />
+                                  {/* Tooltip on hover */}
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
+                                    <span className={`text-[10px] font-mono whitespace-nowrap px-1 py-0.5 rounded bg-background border border-border shadow-sm ${isPositive ? "text-green-400" : "text-red-400"}`}>
+                                      {isPositive ? "+" : ""}{c.toFixed(3)}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <p className="text-[10px] text-muted-foreground text-center">
                   Last 20 matches — green = gained, red = lost
                 </p>
