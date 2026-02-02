@@ -50,7 +50,7 @@ export async function getMatchHistory(
   token: string,
   playerId: number,
   offset = 0,
-  limit = 100
+  limit = 25
 ) {
   return duprFetch(`/player/v1.0/${playerId}/history`, {
     method: "POST",
@@ -67,7 +67,7 @@ export async function getMatchHistory(
 export async function getAllMatchHistory(token: string, playerId: number) {
   const allHits: unknown[] = [];
   let offset = 0;
-  const limit = 100; // DUPR API max is 100
+  const limit = 25; // DUPR API max is 25
   let total = Infinity;
 
   while (offset < total) {

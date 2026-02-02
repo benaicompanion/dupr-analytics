@@ -16,7 +16,7 @@ export async function GET(
   try {
     const { id } = await params;
     const offset = parseInt(req.nextUrl.searchParams.get("offset") || "0");
-    const limit = Math.min(parseInt(req.nextUrl.searchParams.get("limit") || "100"), 100);
+    const limit = Math.min(parseInt(req.nextUrl.searchParams.get("limit") || "25"), 25);
 
     console.log("[DUPR History] Fetching page offset:", offset, "limit:", limit, "player:", id);
     const data = await getMatchHistory(token, parseInt(id), offset, limit);

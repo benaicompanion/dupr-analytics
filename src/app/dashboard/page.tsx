@@ -54,7 +54,7 @@ export default function DashboardPage() {
   async function fetchAllMatches(playerId: number): Promise<any[]> {
     const allMatches: any[] = [];
     let offset = 0;
-    const limit = 100;
+    const limit = 25; // DUPR API max is 25
     let hasMore = true;
 
     while (hasMore) {
