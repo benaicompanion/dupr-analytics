@@ -206,16 +206,7 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">
             Your pickleball analytics dashboard
           </p>
-          {rawMatchCount > 0 && processedMatches.length === 0 && (
-            <div className="mt-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-yellow-400 text-sm">
-              Debug: Loaded {rawMatchCount} raw matches but processed 0. User ID: {userId} (type: {typeof userId})
-            </div>
-          )}
-          {rawMatchCount === 0 && !loading && (
-            <div className="mt-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-yellow-400 text-sm">
-              Debug: No matches loaded from API. Check network tab for errors.
-            </div>
-          )}
+
         </div>
 
         <SummaryStats stats={summary} singlesRating={latestSinglesRating} />
