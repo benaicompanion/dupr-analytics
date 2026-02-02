@@ -306,6 +306,8 @@ export default function DashboardPage() {
             <PunchingStatsPanel
               punchingStats={punchingStats}
               gapPerformance={gapPerformance}
+              rawMatches={matches}
+              userId={userId}
             />
           </TabsContent>
 

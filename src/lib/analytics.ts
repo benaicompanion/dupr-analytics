@@ -546,23 +546,28 @@ export function getClutchStats(rawMatches: any[], userId: number): ClutchStats {
   };
 }
 
-export function getPunchingStats(rawMatches: any[], userId: number): PunchingStats {
-  const above = { wins: 0, losses: 0, totalChange: 0, totalGap: 0, count: 0 };
-  const below = { wins: 0, losses: 0, totalChange: 0, totalGap: 0, count: 0 };
-  const even = { wins: 0, losses: 0, totalChange: 0, count: 0 };
+// mode: "individual" = your DUPR vs avg of opponents' DUPRs
+// mode: "team" = your team avg vs opponent team avg
+interface MatchGapInfo {
+  gap: number;       // positive = opponents/opp team rated higher
+  userWon: boolean;
+  ratingChange: number;
+}
+
+function extractMatchGaps(rawMatches: any[], userId: number, mode: "individual" | "team"): MatchGapInfo[] {
+  const results: MatchGapInfo[] = [];
 
   for (const raw of rawMatches) {
     const teams = raw.teams || [];
     const found = findUserInTeams(teams, userId);
     if (!found) continue;
 
-    const { userTeam, opponentTeam, userPlayer } = found;
+    const { userTeam, opponentTeam } = found;
     if (!userTeam || !opponentTeam) continue;
 
     const userImpact = userTeam.preMatchRatingAndImpact || {};
     const oppImpact = opponentTeam.preMatchRatingAndImpact || {};
 
-    // Get user's pre-match rating
     const isPlayer1 = String(userTeam.player1?.id) === String(userId);
     const userPreRating = isPlayer1
       ? userImpact.preMatchDoubleRatingPlayer1
@@ -571,34 +576,60 @@ export function getPunchingStats(rawMatches: any[], userId: number): PunchingSta
       ? userImpact.matchDoubleRatingImpactPlayer1
       : userImpact.matchDoubleRatingImpactPlayer2;
 
+    const userR1 = userImpact.preMatchDoubleRatingPlayer1;
+    const userR2 = userImpact.preMatchDoubleRatingPlayer2;
     const oppR1 = oppImpact.preMatchDoubleRatingPlayer1;
     const oppR2 = oppImpact.preMatchDoubleRatingPlayer2;
-    const oppRatings = [oppR1, oppR2].filter((r: number) => r != null && r > 0);
 
+    const oppRatings = [oppR1, oppR2].filter((r: number) => r != null && r > 0);
     if (!userPreRating || userPreRating <= 0 || oppRatings.length === 0) continue;
 
-    const oppAvg = oppRatings.reduce((a: number, b: number) => a + b, 0) / oppRatings.length;
-    const gap = oppAvg - userPreRating; // positive = opponents rated higher
-    const userWon = userTeam.winner === true;
-    const change = userRatingChange ?? 0;
+    let gap: number;
+    if (mode === "team") {
+      // Team avg vs team avg
+      const userTeamRatings = [userR1, userR2].filter((r: number) => r != null && r > 0);
+      if (userTeamRatings.length === 0) continue;
+      const userTeamAvg = userTeamRatings.reduce((a: number, b: number) => a + b, 0) / userTeamRatings.length;
+      const oppTeamAvg = oppRatings.reduce((a: number, b: number) => a + b, 0) / oppRatings.length;
+      gap = oppTeamAvg - userTeamAvg;
+    } else {
+      // Individual: user vs avg of opponents
+      const oppAvg = oppRatings.reduce((a: number, b: number) => a + b, 0) / oppRatings.length;
+      gap = oppAvg - userPreRating;
+    }
 
+    results.push({
+      gap,
+      userWon: userTeam.winner === true,
+      ratingChange: userRatingChange ?? 0,
+    });
+  }
+
+  return results;
+}
+
+export function getPunchingStats(rawMatches: any[], userId: number, mode: "individual" | "team" = "individual"): PunchingStats {
+  const gaps = extractMatchGaps(rawMatches, userId, mode);
+
+  const above = { wins: 0, losses: 0, totalChange: 0, totalGap: 0, count: 0 };
+  const below = { wins: 0, losses: 0, totalChange: 0, totalGap: 0, count: 0 };
+  const even = { wins: 0, losses: 0, totalChange: 0, count: 0 };
+
+  for (const { gap, userWon, ratingChange } of gaps) {
     if (gap > 0.1) {
-      // Opponents rated higher ("punching up")
       above.count++;
       if (userWon) above.wins++; else above.losses++;
-      above.totalChange += change;
+      above.totalChange += ratingChange;
       above.totalGap += gap;
     } else if (gap < -0.1) {
-      // Opponents rated lower ("punching down")
       below.count++;
       if (userWon) below.wins++; else below.losses++;
-      below.totalChange += change;
+      below.totalChange += ratingChange;
       below.totalGap += Math.abs(gap);
     } else {
-      // Even matchup (within ±0.1)
       even.count++;
       if (userWon) even.wins++; else even.losses++;
-      even.totalChange += change;
+      even.totalChange += ratingChange;
     }
   }
 
@@ -629,7 +660,9 @@ export function getPunchingStats(rawMatches: any[], userId: number): PunchingSta
   };
 }
 
-export function getRatingGapPerformance(rawMatches: any[], userId: number): RatingGapBucket[] {
+export function getRatingGapPerformance(rawMatches: any[], userId: number, mode: "individual" | "team" = "individual"): RatingGapBucket[] {
+  const gaps = extractMatchGaps(rawMatches, userId, mode);
+
   const buckets: Record<string, { gapMin: number; gapMax: number; wins: number; losses: number; totalChange: number; count: number }> = {
     "-0.5+": { gapMin: -Infinity, gapMax: -0.5, wins: 0, losses: 0, totalChange: 0, count: 0 },
     "-0.5 to -0.3": { gapMin: -0.5, gapMax: -0.3, wins: 0, losses: 0, totalChange: 0, count: 0 },
@@ -640,42 +673,12 @@ export function getRatingGapPerformance(rawMatches: any[], userId: number): Rati
     "+0.5+": { gapMin: 0.5, gapMax: Infinity, wins: 0, losses: 0, totalChange: 0, count: 0 },
   };
 
-  for (const raw of rawMatches) {
-    const teams = raw.teams || [];
-    const found = findUserInTeams(teams, userId);
-    if (!found) continue;
-
-    const { userTeam, opponentTeam } = found;
-    if (!userTeam || !opponentTeam) continue;
-
-    const userImpact = userTeam.preMatchRatingAndImpact || {};
-    const oppImpact = opponentTeam.preMatchRatingAndImpact || {};
-
-    const isPlayer1 = String(userTeam.player1?.id) === String(userId);
-    const userPreRating = isPlayer1
-      ? userImpact.preMatchDoubleRatingPlayer1
-      : userImpact.preMatchDoubleRatingPlayer2;
-    const userRatingChange = isPlayer1
-      ? userImpact.matchDoubleRatingImpactPlayer1
-      : userImpact.matchDoubleRatingImpactPlayer2;
-
-    const oppR1 = oppImpact.preMatchDoubleRatingPlayer1;
-    const oppR2 = oppImpact.preMatchDoubleRatingPlayer2;
-    const oppRatings = [oppR1, oppR2].filter((r: number) => r != null && r > 0);
-
-    if (!userPreRating || userPreRating <= 0 || oppRatings.length === 0) continue;
-
-    const oppAvg = oppRatings.reduce((a: number, b: number) => a + b, 0) / oppRatings.length;
-    const gap = oppAvg - userPreRating; // positive = opponents rated higher
-    const userWon = userTeam.winner === true;
-    const change = userRatingChange ?? 0;
-
-    // Find matching bucket
+  for (const { gap, userWon, ratingChange } of gaps) {
     for (const [, bucket] of Object.entries(buckets)) {
       if (gap >= bucket.gapMin && gap < bucket.gapMax) {
         bucket.count++;
         if (userWon) bucket.wins++; else bucket.losses++;
-        bucket.totalChange += change;
+        bucket.totalChange += ratingChange;
         break;
       }
     }

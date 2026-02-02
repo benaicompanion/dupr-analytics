@@ -1,27 +1,67 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { PunchingStats, RatingGapBucket } from "@/lib/analytics";
+import { getPunchingStats, getRatingGapPerformance } from "@/lib/analytics";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+type CompareMode = "individual" | "team";
 
 interface PunchingStatsProps {
   punchingStats: PunchingStats;
   gapPerformance: RatingGapBucket[];
+  rawMatches: any[];
+  userId: number;
 }
 
-export function PunchingStatsPanel({ punchingStats, gapPerformance }: PunchingStatsProps) {
+export function PunchingStatsPanel({ punchingStats: initialPunching, gapPerformance: initialGap, rawMatches, userId }: PunchingStatsProps) {
+  const [mode, setMode] = useState<CompareMode>("individual");
+
+  // Recompute when mode changes
+  const punchingStats = mode === "individual" ? initialPunching : getPunchingStats(rawMatches, userId, "team");
+  const gapPerformance = mode === "individual" ? initialGap : getRatingGapPerformance(rawMatches, userId, "team");
+
   const { above, below, even } = punchingStats;
 
-  // Determine if overperforming or underperforming
-  const aboveExpected = above.total > 0 && above.winRate > 0.35; // winning >35% against higher-rated is overperforming
-  const belowExpected = below.total > 0 && below.winRate < 0.7; // winning <70% against lower-rated is underperforming
-
-  // Find max total across buckets for bar scaling
-  const maxTotal = Math.max(...gapPerformance.map((b) => b.total), 1);
+  const aboveExpected = above.total > 0 && above.winRate > 0.35;
+  const belowExpected = below.total > 0 && below.winRate < 0.7;
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">Performance vs Rating Gap</h2>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="text-xl font-bold">Performance vs Rating Gap</h2>
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+          <button
+            onClick={() => setMode("individual")}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              mode === "individual"
+                ? "bg-background text-foreground shadow-sm font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            My DUPR vs Opponents
+          </button>
+          <button
+            onClick={() => setMode("team")}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              mode === "team"
+                ? "bg-background text-foreground shadow-sm font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Team vs Team
+          </button>
+        </div>
+      </div>
+
+      <p className="text-sm text-muted-foreground -mt-2">
+        {mode === "individual"
+          ? "Comparing your individual pre-match DUPR against the average of both opponents' DUPRs"
+          : "Comparing your team's average pre-match DUPR (you + partner) against the opponent team's average"}
+      </p>
 
       {/* Punching Up / Down Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -53,7 +93,7 @@ export function PunchingStatsPanel({ punchingStats, gapPerformance }: PunchingSt
                 <div className="text-sm">
                   <span className="text-muted-foreground">Avg gap: </span>
                   <span className="font-mono text-yellow-400">+{above.avgGap.toFixed(2)}</span>
-                  <span className="text-muted-foreground"> DUPR above you</span>
+                  <span className="text-muted-foreground"> DUPR {mode === "team" ? "team gap" : "above you"}</span>
                 </div>
                 <div className="text-sm">
                   <span className="text-muted-foreground">Avg rating change: </span>
@@ -63,7 +103,7 @@ export function PunchingStatsPanel({ punchingStats, gapPerformance }: PunchingSt
                 </div>
               </>
             ) : (
-              <p className="text-muted-foreground text-sm">No matches against higher-rated opponents</p>
+              <p className="text-muted-foreground text-sm">No matches against higher-rated {mode === "team" ? "teams" : "opponents"}</p>
             )}
           </CardContent>
         </Card>
@@ -126,7 +166,7 @@ export function PunchingStatsPanel({ punchingStats, gapPerformance }: PunchingSt
                 <div className="text-sm">
                   <span className="text-muted-foreground">Avg gap: </span>
                   <span className="font-mono text-blue-400">-{below.avgGap.toFixed(2)}</span>
-                  <span className="text-muted-foreground"> DUPR below you</span>
+                  <span className="text-muted-foreground"> DUPR {mode === "team" ? "team gap" : "below you"}</span>
                 </div>
                 <div className="text-sm">
                   <span className="text-muted-foreground">Avg rating change: </span>
@@ -136,7 +176,7 @@ export function PunchingStatsPanel({ punchingStats, gapPerformance }: PunchingSt
                 </div>
               </>
             ) : (
-              <p className="text-muted-foreground text-sm">No matches against lower-rated opponents</p>
+              <p className="text-muted-foreground text-sm">No matches against lower-rated {mode === "team" ? "teams" : "opponents"}</p>
             )}
           </CardContent>
         </Card>
@@ -147,7 +187,9 @@ export function PunchingStatsPanel({ punchingStats, gapPerformance }: PunchingSt
         <CardHeader>
           <CardTitle className="text-base">Rating Gap Performance Curve</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Win rate by how much higher or lower your opponents are rated vs your pre-match DUPR
+            {mode === "individual"
+              ? "Win rate by how much higher or lower your opponents are rated vs your pre-match DUPR"
+              : "Win rate by how much higher or lower the opponent team avg is vs your team avg"}
           </p>
         </CardHeader>
         <CardContent>
@@ -216,7 +258,9 @@ export function PunchingStatsPanel({ punchingStats, gapPerformance }: PunchingSt
             })}
 
             <p className="text-[10px] text-muted-foreground text-center mt-2">
-              Negative gaps = opponents rated below you · Positive gaps = opponents rated above you · Dashed line = 50% win rate
+              {mode === "individual"
+                ? "Negative gaps = opponents rated below you · Positive gaps = opponents rated above you · Vertical line = 50% win rate"
+                : "Negative gaps = opponent team rated below your team · Positive gaps = opponent team rated above your team · Vertical line = 50% win rate"}
             </p>
           </div>
         </CardContent>
