@@ -12,6 +12,7 @@ import { InsightsPanel } from "@/components/insights-panel";
 import { OpponentsTable } from "@/components/opponents-table";
 import { TierChart } from "@/components/tier-chart";
 import { ClubLeaderboard } from "@/components/club-leaderboard";
+import { PunchingStatsPanel } from "@/components/punching-stats";
 import {
   processMatches,
   getPartnerStats,
@@ -23,6 +24,8 @@ import {
   getTierPerformance,
   getNemesisFavorite,
   getClutchStats,
+  getPunchingStats,
+  getRatingGapPerformance,
 } from "@/lib/analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -204,6 +207,8 @@ export default function DashboardPage() {
   const tierPerformance = getTierPerformance(processedMatches, matches, userId);
   const nemesisFavorite = getNemesisFavorite(opponents);
   const clutch = getClutchStats(matches, userId);
+  const punchingStats = getPunchingStats(matches, userId);
+  const gapPerformance = getRatingGapPerformance(matches, userId);
 
   return (
     <div className="min-h-screen bg-background">
@@ -245,6 +250,7 @@ export default function DashboardPage() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="partners">Partners</TabsTrigger>
             <TabsTrigger value="opponents">Opponents</TabsTrigger>
+            <TabsTrigger value="matchups">Matchup Analysis</TabsTrigger>
             <TabsTrigger value="history">Match History</TabsTrigger>
             <TabsTrigger value="club">Club</TabsTrigger>
           </TabsList>
@@ -293,6 +299,13 @@ export default function DashboardPage() {
             <OpponentsTable
               opponents={opponents}
               onPlayerClick={handlePlayerSelect}
+            />
+          </TabsContent>
+
+          <TabsContent value="matchups" className="space-y-6">
+            <PunchingStatsPanel
+              punchingStats={punchingStats}
+              gapPerformance={gapPerformance}
             />
           </TabsContent>
 
