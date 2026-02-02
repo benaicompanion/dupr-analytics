@@ -187,6 +187,15 @@ export default function DashboardPage() {
     doublesChartData
   );
 
+  // Extract clubs from raw match data
+  const clubMap = new Map<number, string>();
+  for (const m of matches) {
+    if (m.clubId && m.clubName && !clubMap.has(m.clubId)) {
+      clubMap.set(m.clubId, m.clubName);
+    }
+  }
+  const clubs = Array.from(clubMap.entries()).map(([id, name]) => ({ id, name }));
+
   // Advanced analytics
   const trajectory = getTrajectoryProjection(processedMatches);
   const volatility = getVolatilityStats(processedMatches);
@@ -295,6 +304,7 @@ export default function DashboardPage() {
             <ClubLeaderboard
               currentUserId={userId}
               onPlayerClick={handlePlayerSelect}
+              clubs={clubs}
             />
           </TabsContent>
         </Tabs>

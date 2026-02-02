@@ -43,13 +43,31 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
+  async function fetchAllMatches(playerId: string): Promise<any[]> {
+    const allMatches: any[] = [];
+    let offset = 0;
+    const limit = 25;
+    let hasMore = true;
+    while (hasMore) {
+      try {
+        const res = await fetch(`/api/player/${playerId}/history?offset=${offset}&limit=${limit}`);
+        if (!res.ok) break;
+        const data = await res.json();
+        if (data.error) break;
+        allMatches.push(...(data.matches || []));
+        hasMore = data.hasMore === true;
+        offset += limit;
+      } catch { break; }
+    }
+    return allMatches;
+  }
+
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const [playerRes, historyRes, ratingRes] = await Promise.all([
+        const [playerRes, ratingRes] = await Promise.all([
           fetch(`/api/player/${id}`),
-          fetch(`/api/player/${id}/history`),
           fetch(`/api/player/${id}/rating-history?type=DOUBLES`),
         ]);
 
@@ -60,11 +78,11 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
         }
 
         const playerData = await playerRes.json();
-        const historyData = await historyRes.json();
         const ratingData = await ratingRes.json();
+        const allMatches = await fetchAllMatches(id);
 
         setPlayer(playerData?.result || playerData);
-        setMatches(historyData.matches || []);
+        setMatches(allMatches);
         setRatingHistory(ratingData?.result?.ratingHistory || ratingData?.result || []);
       } catch {
         setError("Failed to load player data");
@@ -130,6 +148,15 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
     processedMatches,
     currentRating
   );
+
+  // Extract clubs from raw match data
+  const clubMap = new Map<number, string>();
+  for (const m of matches) {
+    if (m.clubId && m.clubName && !clubMap.has(m.clubId)) {
+      clubMap.set(m.clubId, m.clubName);
+    }
+  }
+  const clubs = Array.from(clubMap.entries()).map(([id, name]) => ({ id, name }));
 
   // Advanced analytics
   const trajectory = getTrajectoryProjection(processedMatches);
@@ -243,6 +270,7 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
             <ClubLeaderboard
               currentUserId={playerId}
               onPlayerClick={(pid) => router.push(`/player/${pid}`)}
+              clubs={clubs}
             />
           </TabsContent>
         </Tabs>
