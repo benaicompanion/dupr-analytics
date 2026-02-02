@@ -17,13 +17,16 @@ interface MatchRecord {
   matchId: string;
   date: string;
   eventFormat: string;
-  partner: { name: string; duprId: number } | null;
-  opponents: { name: string; duprId: number }[];
+  partner: { name: string; id: number; duprId: string } | null;
+  opponents: { name: string; id: number; duprId: string }[];
   scores: string;
   won: boolean;
   doublesRating: number | null;
   singlesRating: number | null;
+  doublesRatingBefore: number | null;
+  doublesRatingChange: number | null;
   matchSource: string;
+  eventName: string;
 }
 
 export function MatchHistory({ matches }: { matches: MatchRecord[] }) {
@@ -69,6 +72,7 @@ export function MatchHistory({ matches }: { matches: MatchRecord[] }) {
                 <TableHead>Scores</TableHead>
                 <TableHead className="text-center">Result</TableHead>
                 <TableHead className="text-right">DUPR</TableHead>
+                <TableHead className="text-right">Change</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -79,13 +83,13 @@ export function MatchHistory({ matches }: { matches: MatchRecord[] }) {
                       ? new Date(m.date).toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
-                          year: "numeric",
+                          year: "2-digit",
                         })
                       : "N/A"}
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs">
-                      {m.eventFormat}
+                      {m.eventFormat === "DOUBLES" ? "D" : "S"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">
@@ -109,9 +113,15 @@ export function MatchHistory({ matches }: { matches: MatchRecord[] }) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {m.eventFormat === "DOUBLES"
-                      ? m.doublesRating?.toFixed(2) ?? "—"
-                      : m.singlesRating?.toFixed(2) ?? "—"}
+                    {m.doublesRating?.toFixed(2) ?? m.singlesRating?.toFixed(2) ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {m.doublesRatingChange != null ? (
+                      <span className={m.doublesRatingChange >= 0 ? "text-green-400" : "text-red-400"}>
+                        {m.doublesRatingChange >= 0 ? "+" : ""}
+                        {m.doublesRatingChange.toFixed(3)}
+                      </span>
+                    ) : "—"}
                   </TableCell>
                 </TableRow>
               ))}

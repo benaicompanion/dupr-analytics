@@ -8,18 +8,25 @@ interface Stats {
   lowestRating: number | null;
   totalMatches: number;
   doublesMatches: number;
+  singlesMatches: number;
   totalWins: number;
   totalLosses: number;
   winRate: number;
   doublesWinRate: number;
+  singlesWinRate: number;
 }
 
-export function SummaryStats({ stats }: { stats: Stats }) {
+export function SummaryStats({ stats, singlesRating }: { stats: Stats; singlesRating?: number | null }) {
   const cards = [
     {
-      label: "Current DUPR",
+      label: "Doubles DUPR",
       value: stats.currentRating?.toFixed(2) ?? "N/A",
       color: "text-green-400",
+    },
+    {
+      label: "Singles DUPR",
+      value: singlesRating?.toFixed(2) ?? "N/A",
+      color: "text-teal-400",
     },
     {
       label: "Highest DUPR",
@@ -38,18 +45,25 @@ export function SummaryStats({ stats }: { stats: Stats }) {
     },
     {
       label: "Win Rate",
-      value: `${(stats.winRate * 100).toFixed(1)}%`,
+      value: stats.totalMatches > 0 ? `${(stats.winRate * 100).toFixed(1)}%` : "N/A",
       color: "text-emerald-400",
     },
     {
       label: "Record",
-      value: `${stats.totalWins}W - ${stats.totalLosses}L`,
+      value: stats.totalMatches > 0 ? `${stats.totalWins}W - ${stats.totalLosses}L` : "N/A",
       color: "text-cyan-400",
+    },
+    {
+      label: "Doubles Record",
+      value: stats.doublesMatches > 0
+        ? `${Math.round(stats.doublesWinRate * stats.doublesMatches)}W - ${stats.doublesMatches - Math.round(stats.doublesWinRate * stats.doublesMatches)}L`
+        : "N/A",
+      color: "text-indigo-400",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
       {cards.map((card) => (
         <Card key={card.label}>
           <CardContent className="pt-6">

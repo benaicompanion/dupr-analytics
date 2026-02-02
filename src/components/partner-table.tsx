@@ -13,11 +13,14 @@ import { Badge } from "@/components/ui/badge";
 
 interface PartnerStats {
   name: string;
-  duprId: number;
+  id: number;
+  duprId: string;
   matches: number;
   wins: number;
   losses: number;
   winRate: number;
+  avgDuprChange: number;
+  totalDuprChange: number;
 }
 
 export function PartnerTable({
@@ -46,6 +49,7 @@ export function PartnerTable({
     <Card>
       <CardHeader>
         <CardTitle>Doubles Partner Analysis</CardTitle>
+        <p className="text-sm text-muted-foreground">Sorted by DUPR impact (best to worst)</p>
       </CardHeader>
       <CardContent>
         <Table>
@@ -55,14 +59,16 @@ export function PartnerTable({
               <TableHead className="text-center">Matches</TableHead>
               <TableHead className="text-center">Record</TableHead>
               <TableHead className="text-center">Win Rate</TableHead>
+              <TableHead className="text-center">DUPR Impact</TableHead>
+              <TableHead className="text-center">Avg/Match</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {partners.map((p) => (
               <TableRow
-                key={p.duprId}
+                key={p.id}
                 className={onPlayerClick ? "cursor-pointer hover:bg-muted/50" : ""}
-                onClick={() => onPlayerClick?.(p.duprId)}
+                onClick={() => onPlayerClick?.(p.id)}
               >
                 <TableCell className="font-medium">{p.name}</TableCell>
                 <TableCell className="text-center">{p.matches}</TableCell>
@@ -82,6 +88,16 @@ export function PartnerTable({
                   >
                     {(p.winRate * 100).toFixed(0)}%
                   </Badge>
+                </TableCell>
+                <TableCell className="text-center">
+                  <span className={p.totalDuprChange >= 0 ? "text-green-400" : "text-red-400"}>
+                    {p.totalDuprChange >= 0 ? "+" : ""}{p.totalDuprChange.toFixed(3)}
+                  </span>
+                </TableCell>
+                <TableCell className="text-center">
+                  <span className={p.avgDuprChange >= 0 ? "text-green-400" : "text-red-400"}>
+                    {p.avgDuprChange >= 0 ? "+" : ""}{p.avgDuprChange.toFixed(4)}
+                  </span>
                 </TableCell>
               </TableRow>
             ))}

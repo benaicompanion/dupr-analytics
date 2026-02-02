@@ -11,7 +11,6 @@ import { SearchResults } from "@/components/search-results";
 import {
   processMatches,
   getPartnerStats,
-  buildRatingTimeline,
   getSummaryStats,
 } from "@/lib/analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,11 +21,11 @@ export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [matches, setMatches] = useState<any[]>([]);
-  const [ratingHistory, setRatingHistory] = useState<any[]>([]);
+  const [doublesRatingHistory, setDoublesRatingHistory] = useState<any[]>([]);
+  const [singlesRatingHistory, setSinglesRatingHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Search state
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -55,18 +54,25 @@ export default function DashboardPage() {
     setLoading(true);
     setError("");
     try {
-      const [historyRes, ratingRes] = await Promise.all([
+      const [historyRes, doublesRatingRes, singlesRatingRes] = await Promise.all([
         fetch(`/api/player/${playerId}/history`),
         fetch(`/api/player/${playerId}/rating-history?type=DOUBLES`),
+        fetch(`/api/player/${playerId}/rating-history?type=SINGLES`),
       ]);
 
       const historyData = await historyRes.json();
-      const ratingData = await ratingRes.json();
+      const doublesRatingData = await doublesRatingRes.json();
+      const singlesRatingData = await singlesRatingRes.json();
+
+      if (historyData.error) {
+        console.error("History error:", historyData.error);
+      }
 
       setMatches(historyData.matches || []);
-      // Rating history is nested under result.ratingHistory
-      setRatingHistory(ratingData?.result?.ratingHistory || ratingData?.result || []);
-    } catch {
+      setDoublesRatingHistory(doublesRatingData?.result?.ratingHistory || []);
+      setSinglesRatingHistory(singlesRatingData?.result?.ratingHistory || []);
+    } catch (err) {
+      console.error("Failed to load player data:", err);
       setError("Failed to load player data");
     } finally {
       setLoading(false);
@@ -106,33 +112,34 @@ export default function DashboardPage() {
 
   const userId = user?.id;
   const processedMatches = userId ? processMatches(matches, userId) : [];
+
   const partners = getPartnerStats(processedMatches);
-  const timeline = buildRatingTimeline(processedMatches);
 
-  // Use dedicated rating-history API if available, fall back to match-derived timeline
-  const ratingChartData =
-    ratingHistory.length > 0
-      ? ratingHistory
-          .map((r: any) => ({
-            date: r.date || r.eventDate,
-            rating: r.rating ?? r.doubles ?? r.doublesRating,
-          }))
-          .filter((r: any) => r.date && r.rating != null)
-          .sort(
-            (a: any, b: any) =>
-              new Date(a.date).getTime() - new Date(b.date).getTime()
-          )
-      : timeline;
+  // Build chart data from rating history API
+  const toChartData = (history: any[]) =>
+    history
+      .map((r: any) => ({
+        date: r.date || r.matchDate,
+        rating: r.rating,
+      }))
+      .filter((r: any) => r.date && r.rating != null)
+      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Get current rating from latest rating history entry, or from user profile
-  const latestRating = ratingChartData.length > 0
-    ? ratingChartData[ratingChartData.length - 1]?.rating
+  const doublesChartData = toChartData(doublesRatingHistory);
+  const singlesChartData = toChartData(singlesRatingHistory);
+
+  // Current ratings from latest history entry
+  const latestDoublesRating = doublesChartData.length > 0
+    ? doublesChartData[doublesChartData.length - 1]?.rating
     : null;
-  const currentRating = latestRating ?? user?.doublesRating ?? null;
+  const latestSinglesRating = singlesChartData.length > 0
+    ? singlesChartData[singlesChartData.length - 1]?.rating
+    : null;
 
   const summary = getSummaryStats(
     processedMatches,
-    currentRating
+    latestDoublesRating,
+    doublesChartData
   );
 
   return (
@@ -167,7 +174,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <SummaryStats stats={summary} />
+        <SummaryStats stats={summary} singlesRating={latestSinglesRating} />
 
         <Tabs defaultValue="overview" className="space-y-4">
           <TabsList>
@@ -177,7 +184,10 @@ export default function DashboardPage() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <RatingChart data={ratingChartData} />
+            <RatingChart data={doublesChartData} title="Doubles Rating Over Time" />
+            {singlesChartData.length > 0 && (
+              <RatingChart data={singlesChartData} title="Singles Rating Over Time" />
+            )}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <PartnerTable
                 partners={partners.slice(0, 10)}
