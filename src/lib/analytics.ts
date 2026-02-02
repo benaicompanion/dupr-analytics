@@ -309,7 +309,9 @@ export function getTrajectoryProjection(matches: MatchRecord[]): TrajectoryProje
 }
 
 export function getVolatilityStats(matches: MatchRecord[]): VolatilityStats | null {
-  const changes = matches
+  // Matches come in DESC order (newest first) from API — reverse to chronological
+  const chronological = [...matches].reverse();
+  const changes = chronological
     .filter((m) => m.doublesRatingChange != null)
     .map((m) => m.doublesRatingChange!);
   
@@ -319,6 +321,7 @@ export function getVolatilityStats(matches: MatchRecord[]): VolatilityStats | nu
   const variance = changes.reduce((s, c) => s + (c - mean) ** 2, 0) / changes.length;
   const stdDev = Math.sqrt(variance);
   
+  // Now slice(-10) correctly gets the most recent 10
   const recentChanges = changes.slice(-10);
   const recentMean = recentChanges.reduce((a, b) => a + b, 0) / recentChanges.length;
   const recentVariance = recentChanges.reduce((s, c) => s + (c - recentMean) ** 2, 0) / recentChanges.length;
