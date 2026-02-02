@@ -78,11 +78,11 @@ export function ClubLeaderboard({
     .map((m: any) => ({
       id: m.id,
       name: m.fullName || "Unknown",
-      doublesRating: m.doubles ?? null,
-      singlesRating: m.singles ?? null,
+      doublesRating: m.doubles != null ? Number(m.doubles) : null,
+      singlesRating: m.singles != null ? Number(m.singles) : null,
       imageUrl: m.imageUrl,
     }))
-    .filter((m) => m.doublesRating != null && m.doublesRating > 0)
+    .filter((m) => m.doublesRating != null && !isNaN(m.doublesRating) && m.doublesRating > 0)
     .sort((a, b) => (b.doublesRating ?? 0) - (a.doublesRating ?? 0));
 
   const currentUserRank = sorted.findIndex(
