@@ -64,7 +64,8 @@ export default function DashboardPage() {
       const ratingData = await ratingRes.json();
 
       setMatches(historyData.matches || []);
-      setRatingHistory(ratingData?.result || []);
+      // Rating history is nested under result.ratingHistory
+      setRatingHistory(ratingData?.result?.ratingHistory || ratingData?.result || []);
     } catch {
       setError("Failed to load player data");
     } finally {
@@ -123,9 +124,15 @@ export default function DashboardPage() {
           )
       : timeline;
 
+  // Get current rating from latest rating history entry, or from user profile
+  const latestRating = ratingChartData.length > 0
+    ? ratingChartData[ratingChartData.length - 1]?.rating
+    : null;
+  const currentRating = latestRating ?? user?.doublesRating ?? null;
+
   const summary = getSummaryStats(
     processedMatches,
-    user?.doublesRating
+    currentRating
   );
 
   return (

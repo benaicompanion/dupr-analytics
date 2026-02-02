@@ -67,23 +67,18 @@ export function processMatches(
           ? [opponentTeam.player1, opponentTeam.player2].filter(Boolean)
           : [];
 
-        // Scores can be on team objects (game1, game2, game3) or in a separate games array
+        // Scores are on team objects (game1-game5), -1 means not played
         let scoreStr = "N/A";
         if (userTeam && opponentTeam) {
           const scores: string[] = [];
-          for (const gameKey of ["game1", "game2", "game3"]) {
+          for (const gameKey of ["game1", "game2", "game3", "game4", "game5"]) {
             const s1 = userTeam[gameKey];
             const s2 = opponentTeam[gameKey];
-            if (s1 != null && s2 != null) {
+            if (s1 != null && s2 != null && s1 >= 0 && s2 >= 0) {
               scores.push(`${s1}-${s2}`);
             }
           }
           if (scores.length > 0) scoreStr = scores.join(", ");
-        }
-        if (scoreStr === "N/A" && match.games?.length > 0) {
-          scoreStr = match.games
-            .map((g: any) => `${g.team1Score ?? g.game1 ?? "?"}-${g.team2Score ?? g.game2 ?? "?"}`)
-            .join(", ");
         }
 
         return {
@@ -99,8 +94,8 @@ export function processMatches(
           })),
           scores: scoreStr || "N/A",
           won: userTeam.winner === true,
-          doublesRating: userPlayer.doubles ?? userPlayer.doublesRating ?? null,
-          singlesRating: userPlayer.singles ?? userPlayer.singlesRating ?? null,
+          doublesRating: userPlayer.postMatchRating?.doubles ?? userPlayer.doubles ?? userPlayer.doublesRating ?? null,
+          singlesRating: userPlayer.postMatchRating?.singles ?? userPlayer.singles ?? userPlayer.singlesRating ?? null,
           matchSource: match.matchSource || "",
           matchType: match.matchType || "",
         };

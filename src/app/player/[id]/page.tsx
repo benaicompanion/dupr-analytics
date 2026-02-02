@@ -54,7 +54,7 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
 
         setPlayer(playerData?.result || playerData);
         setMatches(historyData.matches || []);
-        setRatingHistory(ratingData?.result || []);
+        setRatingHistory(ratingData?.result?.ratingHistory || ratingData?.result || []);
       } catch {
         setError("Failed to load player data");
       } finally {
@@ -110,9 +110,14 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
           )
       : timeline;
 
+  const latestRating = ratingChartData.length > 0
+    ? ratingChartData[ratingChartData.length - 1]?.rating
+    : null;
+  const currentRating = latestRating ?? player?.doubles ?? player?.doublesRating ?? null;
+
   const summary = getSummaryStats(
     processedMatches,
-    player?.doubles ?? player?.doublesRating
+    currentRating
   );
 
   return (
