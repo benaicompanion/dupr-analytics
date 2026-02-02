@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getToken, getUser } from "@/lib/auth";
 import { getMatchHistory, getRatingHistory } from "@/lib/dupr-api";
+import { processMatches } from "@/lib/analytics";
 
 export async function GET() {
   const token = await getToken();
@@ -14,14 +15,37 @@ export async function GET() {
 
     // Fetch first page of match history
     const historyData = await getMatchHistory(token, playerId, 0, 5);
-    const ratingData = await getRatingHistory(token, playerId, "DOUBLES");
+    const matches = historyData?.result?.hits || [];
+    
+    // Try processing matches
+    const processed = processMatches(matches, playerId);
+    
+    // Debug: check first match team players
+    const firstMatch = matches[0];
+    const teamPlayerIds = firstMatch?.teams?.map((t: Record<string, unknown>) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      player1Id: (t.player1 as any)?.id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      player1IdType: typeof (t.player1 as any)?.id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      player2Id: (t.player2 as any)?.id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      player2IdType: typeof (t.player2 as any)?.id,
+    }));
 
-    // Return raw API responses for debugging
     return NextResponse.json({
       user,
       playerId,
-      historyResponse: historyData,
-      ratingHistoryResponse: ratingData,
+      playerIdType: typeof playerId,
+      matchCount: matches.length,
+      processedCount: processed.length,
+      firstProcessed: processed[0] || null,
+      teamPlayerIds,
+      userIdString: String(playerId),
+      matchPlayerIdString: String(firstMatch?.teams?.[1]?.player2?.id),
+      match: firstMatch?.teams?.[1]?.player2?.id === playerId,
+      strictMatch: firstMatch?.teams?.[1]?.player2?.id === playerId,
+      stringMatch: String(firstMatch?.teams?.[1]?.player2?.id) === String(playerId),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Debug failed";
