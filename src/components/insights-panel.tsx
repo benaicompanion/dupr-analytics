@@ -61,54 +61,92 @@ export function InsightsPanel({
         )}
 
         {/* Volatility */}
-        {volatility && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                🎢 Rating Volatility
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold">
-                  {volatility.label}
-                </span>
-                <Badge
-                  className={
-                    volatility.label === "Low"
-                      ? "bg-green-600/20 text-green-400 border-green-600/30"
-                      : volatility.label === "Medium"
-                      ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
-                      : "bg-red-600/20 text-red-400 border-red-600/30"
-                  }
-                >
-                  σ = {volatility.stdDev.toFixed(4)}
-                </Badge>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Recent (10)</span>
-                <span className={volatility.recentStdDev > volatility.stdDev ? "text-red-400" : "text-green-400"}>
-                  σ = {volatility.recentStdDev.toFixed(4)}
-                  {volatility.recentStdDev > volatility.stdDev ? " ↑" : " ↓"}
-                </span>
-              </div>
-              {/* Mini sparkline of recent changes */}
-              <div className="flex items-end gap-[2px] h-8 mt-1">
-                {volatility.changes.slice(-20).map((c, i) => {
-                  const maxAbs = Math.max(...volatility.changes.slice(-20).map(Math.abs), 0.01);
-                  const height = Math.max(2, (Math.abs(c) / maxAbs) * 28);
-                  return (
-                    <div
-                      key={i}
-                      className={`flex-1 rounded-sm ${c >= 0 ? "bg-green-500" : "bg-red-500"}`}
-                      style={{ height: `${height}px` }}
-                    />
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {volatility && (() => {
+          const avgSwing = volatility.changes.length > 0
+            ? volatility.changes.reduce((s, c) => s + Math.abs(c), 0) / volatility.changes.length
+            : 0;
+          const recentChanges = volatility.changes.slice(-10);
+          const recentAvgSwing = recentChanges.length > 0
+            ? recentChanges.reduce((s, c) => s + Math.abs(c), 0) / recentChanges.length
+            : 0;
+          const bigSwings = volatility.changes.filter((c) => Math.abs(c) > 0.05).length;
+          const trendLabel = recentAvgSwing > avgSwing * 1.2
+            ? "Getting more volatile"
+            : recentAvgSwing < avgSwing * 0.8
+            ? "Stabilizing"
+            : "Consistent";
+          const trendColor = recentAvgSwing > avgSwing * 1.2
+            ? "text-yellow-400"
+            : recentAvgSwing < avgSwing * 0.8
+            ? "text-green-400"
+            : "text-muted-foreground";
+
+          return (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  🎢 Rating Consistency
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold">
+                    {volatility.label === "Low" ? "Steady" : volatility.label === "Medium" ? "Moderate" : "Streaky"}
+                  </span>
+                  <Badge
+                    className={
+                      volatility.label === "Low"
+                        ? "bg-green-600/20 text-green-400 border-green-600/30"
+                        : volatility.label === "Medium"
+                        ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
+                        : "bg-red-600/20 text-red-400 border-red-600/30"
+                    }
+                  >
+                    {volatility.label === "Low" ? "🧊" : volatility.label === "Medium" ? "〰️" : "📈📉"}
+                  </Badge>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Avg. swing per match</span>
+                    <span className="font-medium">±{avgSwing.toFixed(3)} DUPR</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Last 10 matches</span>
+                    <span className="font-medium">±{recentAvgSwing.toFixed(3)} DUPR</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Big swings (±0.05+)</span>
+                    <span className="font-medium">{bigSwings} of {volatility.changes.length}</span>
+                  </div>
+                </div>
+
+                <p className={`text-xs font-medium ${trendColor}`}>
+                  {trendLabel}
+                </p>
+
+                {/* Mini sparkline of recent changes */}
+                <div className="flex items-end gap-[2px] h-8">
+                  {volatility.changes.slice(-20).map((c, i) => {
+                    const maxAbs = Math.max(...volatility.changes.slice(-20).map(Math.abs), 0.01);
+                    const height = Math.max(2, (Math.abs(c) / maxAbs) * 28);
+                    return (
+                      <div
+                        key={i}
+                        className={`flex-1 rounded-sm ${c >= 0 ? "bg-green-500" : "bg-red-500"}`}
+                        style={{ height: `${height}px` }}
+                        title={`${c >= 0 ? "+" : ""}${c.toFixed(3)}`}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Last 20 matches — green = gained, red = lost
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Upset Rate */}
         <Card>
