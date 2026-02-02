@@ -17,11 +17,13 @@ export async function GET(
     const matches = await getAllMatchHistory(token, parseInt(id));
     console.log("[DUPR History] Got", matches.length, "matches");
     if (matches.length > 0) {
-      console.log("[DUPR History] First match keys:", Object.keys(matches[0]));
-      console.log("[DUPR History] First match teams:", JSON.stringify(matches[0].teams?.map((t: Record<string, unknown>) => ({
-        player1Id: (t.player1 as Record<string, unknown>)?.id,
-        player1DuprId: (t.player1 as Record<string, unknown>)?.duprId,
-        player1Name: (t.player1 as Record<string, unknown>)?.fullName,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const first = matches[0] as any;
+      console.log("[DUPR History] First match keys:", Object.keys(first));
+      console.log("[DUPR History] First match teams:", JSON.stringify(first.teams?.map((t: any) => ({
+        player1Id: t.player1?.id,
+        player1DuprId: t.player1?.duprId,
+        player1Name: t.player1?.fullName,
         winner: t.winner,
         game1: t.game1,
         game2: t.game2,
