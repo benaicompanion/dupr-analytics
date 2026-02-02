@@ -8,10 +8,21 @@ import { RatingChart } from "@/components/rating-chart";
 import { PartnerTable } from "@/components/partner-table";
 import { MatchHistory } from "@/components/match-history";
 import { SearchResults } from "@/components/search-results";
+import { InsightsPanel } from "@/components/insights-panel";
+import { OpponentsTable } from "@/components/opponents-table";
+import { TierChart } from "@/components/tier-chart";
+import { ClubLeaderboard } from "@/components/club-leaderboard";
 import {
   processMatches,
   getPartnerStats,
   getSummaryStats,
+  getTrajectoryProjection,
+  getVolatilityStats,
+  getOpponentStats,
+  getUpsetStats,
+  getTierPerformance,
+  getNemesisFavorite,
+  getClutchStats,
 } from "@/lib/analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -176,6 +187,15 @@ export default function DashboardPage() {
     doublesChartData
   );
 
+  // Advanced analytics
+  const trajectory = getTrajectoryProjection(processedMatches);
+  const volatility = getVolatilityStats(processedMatches);
+  const opponents = getOpponentStats(processedMatches);
+  const upsets = getUpsetStats(processedMatches, matches, userId);
+  const tierPerformance = getTierPerformance(processedMatches, matches, userId);
+  const nemesisFavorite = getNemesisFavorite(opponents);
+  const clutch = getClutchStats(matches, userId);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar userName={user?.fullName} onSearch={handleSearch} />
@@ -215,14 +235,27 @@ export default function DashboardPage() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="partners">Partners</TabsTrigger>
+            <TabsTrigger value="opponents">Opponents</TabsTrigger>
             <TabsTrigger value="history">Match History</TabsTrigger>
+            <TabsTrigger value="club">Club</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <RatingChart data={doublesChartData} title="Doubles Rating Over Time" />
+            <RatingChart data={doublesChartData} title="Doubles Rating Over Time" trajectory={trajectory} />
             {singlesChartData.length > 0 && (
               <RatingChart data={singlesChartData} title="Singles Rating Over Time" />
             )}
+
+            <InsightsPanel
+              trajectory={trajectory}
+              volatility={volatility}
+              upsets={upsets}
+              nemesisFavorite={nemesisFavorite}
+              clutch={clutch}
+            />
+
+            <TierChart data={tierPerformance} />
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <PartnerTable
                 partners={partners.slice(0, 10)}
@@ -230,8 +263,13 @@ export default function DashboardPage() {
                 title="Top 10 Partners by DUPR Impact"
                 totalCount={partners.length}
               />
-              <MatchHistory matches={processedMatches.slice(0, 10)} />
+              <OpponentsTable
+                opponents={opponents}
+                limit={10}
+                onPlayerClick={handlePlayerSelect}
+              />
             </div>
+            <MatchHistory matches={processedMatches.slice(0, 10)} />
           </TabsContent>
 
           <TabsContent value="partners">
@@ -241,8 +279,23 @@ export default function DashboardPage() {
             />
           </TabsContent>
 
+          <TabsContent value="opponents" className="space-y-6">
+            <TierChart data={tierPerformance} />
+            <OpponentsTable
+              opponents={opponents}
+              onPlayerClick={handlePlayerSelect}
+            />
+          </TabsContent>
+
           <TabsContent value="history">
             <MatchHistory matches={processedMatches} />
+          </TabsContent>
+
+          <TabsContent value="club">
+            <ClubLeaderboard
+              currentUserId={userId}
+              onPlayerClick={handlePlayerSelect}
+            />
           </TabsContent>
         </Tabs>
       </main>
