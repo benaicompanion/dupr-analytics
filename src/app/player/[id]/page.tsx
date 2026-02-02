@@ -8,11 +8,22 @@ import { RatingChart } from "@/components/rating-chart";
 import { PartnerTable } from "@/components/partner-table";
 import { MatchHistory } from "@/components/match-history";
 import { SearchResults } from "@/components/search-results";
+import { InsightsPanel } from "@/components/insights-panel";
+import { OpponentsTable } from "@/components/opponents-table";
+import { TierChart } from "@/components/tier-chart";
+import { ClubLeaderboard } from "@/components/club-leaderboard";
 import {
   processMatches,
   getPartnerStats,
   buildRatingTimeline,
   getSummaryStats,
+  getTrajectoryProjection,
+  getVolatilityStats,
+  getOpponentStats,
+  getUpsetStats,
+  getTierPerformance,
+  getNemesisFavorite,
+  getClutchStats,
 } from "@/lib/analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -120,6 +131,15 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
     currentRating
   );
 
+  // Advanced analytics
+  const trajectory = getTrajectoryProjection(processedMatches);
+  const volatility = getVolatilityStats(processedMatches);
+  const opponents = getOpponentStats(processedMatches);
+  const upsets = getUpsetStats(processedMatches, matches, playerId);
+  const tierPerformance = getTierPerformance(processedMatches, matches, playerId);
+  const nemesisFavorite = getNemesisFavorite(opponents);
+  const clutch = getClutchStats(matches, playerId);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar onSearch={handleSearch} />
@@ -163,21 +183,41 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="partners">Partners</TabsTrigger>
+            <TabsTrigger value="opponents">Opponents</TabsTrigger>
             <TabsTrigger value="history">Match History</TabsTrigger>
+            <TabsTrigger value="club">Club</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             <RatingChart
               data={ratingChartData}
               title={`${player?.fullName || "Player"} - Doubles Rating`}
+              trajectory={trajectory}
             />
+
+            <InsightsPanel
+              trajectory={trajectory}
+              volatility={volatility}
+              upsets={upsets}
+              nemesisFavorite={nemesisFavorite}
+              clutch={clutch}
+            />
+
+            <TierChart data={tierPerformance} />
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <OpponentsTable
+                opponents={opponents}
+                limit={10}
+                onPlayerClick={(pid) => router.push(`/player/${pid}`)}
+              />
               <PartnerTable
                 partners={partners.slice(0, 10)}
                 onPlayerClick={(pid) => router.push(`/player/${pid}`)}
               />
-              <MatchHistory matches={processedMatches.slice(0, 10)} />
             </div>
+
+            <MatchHistory matches={processedMatches.slice(0, 10)} />
           </TabsContent>
 
           <TabsContent value="partners">
@@ -187,8 +227,23 @@ export default function PlayerPage({ params }: { params: Promise<{ id: string }>
             />
           </TabsContent>
 
+          <TabsContent value="opponents" className="space-y-6">
+            <TierChart data={tierPerformance} />
+            <OpponentsTable
+              opponents={opponents}
+              onPlayerClick={(pid) => router.push(`/player/${pid}`)}
+            />
+          </TabsContent>
+
           <TabsContent value="history">
             <MatchHistory matches={processedMatches} />
+          </TabsContent>
+
+          <TabsContent value="club">
+            <ClubLeaderboard
+              currentUserId={playerId}
+              onPlayerClick={(pid) => router.push(`/player/${pid}`)}
+            />
           </TabsContent>
         </Tabs>
       </main>

@@ -206,6 +206,306 @@ export function buildRatingTimeline(matches: MatchRecord[]): RatingPoint[] {
   }));
 }
 
+// ==========================================
+// Advanced Analytics
+// ==========================================
+
+export interface OpponentStats {
+  name: string;
+  id: number;
+  duprId: string;
+  matches: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+}
+
+export interface UpsetStats {
+  upsetsPulled: number;
+  upsetsSuffered: number;
+  totalWithRatings: number;
+  upsetsPulledRate: number;
+  upsetsSufferedRate: number;
+}
+
+export interface TierPerformance {
+  tier: string;
+  wins: number;
+  losses: number;
+  total: number;
+  winRate: number;
+}
+
+export interface NemesisFavorite {
+  nemesis: OpponentStats | null;
+  favorite: OpponentStats | null;
+}
+
+export interface ClutchStats {
+  clutchGames: number;
+  clutchWins: number;
+  clutchWinRate: number;
+  overallGameWinRate: number;
+}
+
+export interface VolatilityStats {
+  stdDev: number;
+  recentStdDev: number; // last 10 matches
+  label: "Low" | "Medium" | "High";
+  changes: number[];
+}
+
+export interface TrajectoryProjection {
+  slope: number; // rating change per day
+  projections: { days: number; rating: number }[];
+  dataPoints: { date: string; rating: number }[];
+}
+
+// Linear regression helper
+function linearRegression(points: { x: number; y: number }[]): { slope: number; intercept: number } {
+  const n = points.length;
+  if (n < 2) return { slope: 0, intercept: points[0]?.y ?? 0 };
+  
+  const sumX = points.reduce((s, p) => s + p.x, 0);
+  const sumY = points.reduce((s, p) => s + p.y, 0);
+  const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+  const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
+  
+  const denom = n * sumX2 - sumX * sumX;
+  if (denom === 0) return { slope: 0, intercept: sumY / n };
+  
+  const slope = (n * sumXY - sumX * sumY) / denom;
+  const intercept = (sumY - slope * sumX) / n;
+  return { slope, intercept };
+}
+
+export function getTrajectoryProjection(matches: MatchRecord[]): TrajectoryProjection | null {
+  const sorted = matches
+    .filter((m) => m.eventFormat === "DOUBLES" && m.doublesRating != null && m.date)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  // Use last 20 matches
+  const recent = sorted.slice(-20);
+  if (recent.length < 5) return null;
+  
+  const firstDate = new Date(recent[0].date).getTime();
+  const points = recent.map((m) => ({
+    x: (new Date(m.date).getTime() - firstDate) / (1000 * 60 * 60 * 24), // days since first
+    y: m.doublesRating!,
+  }));
+  
+  const { slope, intercept } = linearRegression(points);
+  const lastDay = points[points.length - 1].x;
+  const lastRating = slope * lastDay + intercept;
+  
+  return {
+    slope,
+    projections: [30, 60, 90].map((days) => ({
+      days,
+      rating: Math.round((lastRating + slope * days) * 100) / 100,
+    })),
+    dataPoints: recent.map((m) => ({ date: m.date, rating: m.doublesRating! })),
+  };
+}
+
+export function getVolatilityStats(matches: MatchRecord[]): VolatilityStats | null {
+  const changes = matches
+    .filter((m) => m.doublesRatingChange != null)
+    .map((m) => m.doublesRatingChange!);
+  
+  if (changes.length < 3) return null;
+  
+  const mean = changes.reduce((a, b) => a + b, 0) / changes.length;
+  const variance = changes.reduce((s, c) => s + (c - mean) ** 2, 0) / changes.length;
+  const stdDev = Math.sqrt(variance);
+  
+  const recentChanges = changes.slice(-10);
+  const recentMean = recentChanges.reduce((a, b) => a + b, 0) / recentChanges.length;
+  const recentVariance = recentChanges.reduce((s, c) => s + (c - recentMean) ** 2, 0) / recentChanges.length;
+  const recentStdDev = Math.sqrt(recentVariance);
+  
+  let label: "Low" | "Medium" | "High" = "Low";
+  if (stdDev > 0.03) label = "Medium";
+  if (stdDev > 0.06) label = "High";
+  
+  return { stdDev, recentStdDev, label, changes };
+}
+
+export function getOpponentStats(matches: MatchRecord[]): OpponentStats[] {
+  const opponentMap = new Map<number, { name: string; id: number; duprId: string; wins: number; losses: number }>();
+  
+  for (const match of matches) {
+    for (const opp of match.opponents) {
+      if (!opp.id) continue;
+      if (!opponentMap.has(opp.id)) {
+        opponentMap.set(opp.id, { name: opp.name, id: opp.id, duprId: opp.duprId, wins: 0, losses: 0 });
+      }
+      const entry = opponentMap.get(opp.id)!;
+      if (match.won) entry.wins++;
+      else entry.losses++;
+    }
+  }
+  
+  return Array.from(opponentMap.values())
+    .map((o) => ({
+      ...o,
+      matches: o.wins + o.losses,
+      winRate: (o.wins + o.losses) > 0 ? o.wins / (o.wins + o.losses) : 0,
+    }))
+    .sort((a, b) => b.matches - a.matches);
+}
+
+export function getUpsetStats(matches: MatchRecord[], rawMatches: any[], userId: number): UpsetStats {
+  let upsetsPulled = 0;
+  let upsetsSuffered = 0;
+  let totalWithRatings = 0;
+  
+  for (const raw of rawMatches) {
+    const teams = raw.teams || [];
+    const found = findUserInTeams(teams, userId);
+    if (!found) continue;
+    
+    const { userTeam, opponentTeam } = found;
+    if (!userTeam || !opponentTeam) continue;
+    
+    const userImpact = userTeam.preMatchRatingAndImpact || {};
+    const oppImpact = opponentTeam.preMatchRatingAndImpact || {};
+    
+    // Get pre-match ratings for both teams
+    const userR1 = userImpact.preMatchDoubleRatingPlayer1;
+    const userR2 = userImpact.preMatchDoubleRatingPlayer2;
+    const oppR1 = oppImpact.preMatchDoubleRatingPlayer1;
+    const oppR2 = oppImpact.preMatchDoubleRatingPlayer2;
+    
+    const userRatings = [userR1, userR2].filter((r) => r != null && r > 0);
+    const oppRatings = [oppR1, oppR2].filter((r) => r != null && r > 0);
+    
+    if (userRatings.length === 0 || oppRatings.length === 0) continue;
+    
+    const userAvg = userRatings.reduce((a: number, b: number) => a + b, 0) / userRatings.length;
+    const oppAvg = oppRatings.reduce((a: number, b: number) => a + b, 0) / oppRatings.length;
+    
+    totalWithRatings++;
+    const userWon = userTeam.winner === true;
+    const ratingDiff = userAvg - oppAvg;
+    
+    if (userWon && ratingDiff < -0.05) {
+      // Won as underdog
+      upsetsPulled++;
+    } else if (!userWon && ratingDiff > 0.05) {
+      // Lost as favorite
+      upsetsSuffered++;
+    }
+  }
+  
+  return {
+    upsetsPulled,
+    upsetsSuffered,
+    totalWithRatings,
+    upsetsPulledRate: totalWithRatings > 0 ? upsetsPulled / totalWithRatings : 0,
+    upsetsSufferedRate: totalWithRatings > 0 ? upsetsSuffered / totalWithRatings : 0,
+  };
+}
+
+export function getTierPerformance(matches: MatchRecord[], rawMatches: any[], userId: number): TierPerformance[] {
+  const tiers: Record<string, { wins: number; losses: number }> = {
+    "< 3.0": { wins: 0, losses: 0 },
+    "3.0 - 3.5": { wins: 0, losses: 0 },
+    "3.5 - 4.0": { wins: 0, losses: 0 },
+    "4.0 - 4.5": { wins: 0, losses: 0 },
+    "4.5+": { wins: 0, losses: 0 },
+  };
+  
+  for (const raw of rawMatches) {
+    const teams = raw.teams || [];
+    const found = findUserInTeams(teams, userId);
+    if (!found) continue;
+    
+    const { userTeam, opponentTeam } = found;
+    if (!opponentTeam) continue;
+    
+    const oppImpact = opponentTeam.preMatchRatingAndImpact || {};
+    const oppR1 = oppImpact.preMatchDoubleRatingPlayer1;
+    const oppR2 = oppImpact.preMatchDoubleRatingPlayer2;
+    const oppRatings = [oppR1, oppR2].filter((r: number) => r != null && r > 0);
+    if (oppRatings.length === 0) continue;
+    
+    const oppAvg = oppRatings.reduce((a: number, b: number) => a + b, 0) / oppRatings.length;
+    const userWon = userTeam.winner === true;
+    
+    let tier: string;
+    if (oppAvg < 3.0) tier = "< 3.0";
+    else if (oppAvg < 3.5) tier = "3.0 - 3.5";
+    else if (oppAvg < 4.0) tier = "3.5 - 4.0";
+    else if (oppAvg < 4.5) tier = "4.0 - 4.5";
+    else tier = "4.5+";
+    
+    if (userWon) tiers[tier].wins++;
+    else tiers[tier].losses++;
+  }
+  
+  return Object.entries(tiers).map(([tier, { wins, losses }]) => ({
+    tier,
+    wins,
+    losses,
+    total: wins + losses,
+    winRate: (wins + losses) > 0 ? wins / (wins + losses) : 0,
+  }));
+}
+
+export function getNemesisFavorite(opponents: OpponentStats[]): NemesisFavorite {
+  const qualified = opponents.filter((o) => o.matches >= 2);
+  if (qualified.length === 0) return { nemesis: null, favorite: null };
+  
+  const nemesis = qualified.reduce((worst, o) => (o.winRate < worst.winRate ? o : worst), qualified[0]);
+  const favorite = qualified.reduce((best, o) => (o.winRate > best.winRate ? o : best), qualified[0]);
+  
+  return {
+    nemesis: nemesis.winRate < 0.5 ? nemesis : null,
+    favorite: favorite.winRate > 0.5 ? favorite : null,
+  };
+}
+
+export function getClutchStats(rawMatches: any[], userId: number): ClutchStats {
+  let clutchGames = 0;
+  let clutchWins = 0;
+  let totalGames = 0;
+  let totalGameWins = 0;
+  
+  for (const raw of rawMatches) {
+    const teams = raw.teams || [];
+    const found = findUserInTeams(teams, userId);
+    if (!found) continue;
+    
+    const { userTeam, opponentTeam } = found;
+    if (!opponentTeam) continue;
+    
+    for (const gameKey of ["game1", "game2", "game3", "game4", "game5"]) {
+      const userScore = userTeam[gameKey];
+      const oppScore = opponentTeam[gameKey];
+      if (userScore == null || oppScore == null || userScore < 0 || oppScore < 0) continue;
+      
+      totalGames++;
+      const diff = Math.abs(userScore - oppScore);
+      const userWonGame = userScore > oppScore;
+      
+      if (userWonGame) totalGameWins++;
+      
+      if (diff <= 3) {
+        clutchGames++;
+        if (userWonGame) clutchWins++;
+      }
+    }
+  }
+  
+  return {
+    clutchGames,
+    clutchWins,
+    clutchWinRate: clutchGames > 0 ? clutchWins / clutchGames : 0,
+    overallGameWinRate: totalGames > 0 ? totalGameWins / totalGames : 0,
+  };
+}
+
 export function getSummaryStats(
   matches: MatchRecord[],
   currentRating?: number | null,
