@@ -27,7 +27,7 @@ export async function duprFetch(
 }
 
 export async function login(email: string, password: string) {
-  const data = await duprFetch("/auth/v1.0/login", {
+  const data = await duprFetch("/auth/v1.0/login/", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -35,7 +35,7 @@ export async function login(email: string, password: string) {
 }
 
 export async function getProfile(token: string) {
-  return duprFetch("/user/v1.0/profile", { token });
+  return duprFetch("/user/v1.0/profile/", { token });
 }
 
 export async function getPlayer(token: string, playerId: number) {

@@ -41,11 +41,15 @@ export function processMatches(
         let opponentTeam: any = null;
         let userPlayer: any = null;
 
+        // Match user by id or duprId (compare as strings to handle type mismatches)
+        const isUser = (p: any) => {
+          const uid = String(userId);
+          return String(p.id) === uid || String(p.duprId) === uid;
+        };
+
         for (const team of teams) {
           const players = [team.player1, team.player2].filter(Boolean);
-          const found = players.find(
-            (p: any) => p.id === userId || p.duprId === userId
-          );
+          const found = players.find(isUser);
           if (found) {
             userTeam = team;
             userPlayer = found;
@@ -57,18 +61,30 @@ export function processMatches(
         if (!userTeam || !userPlayer) return null;
 
         const teamPlayers = [userTeam.player1, userTeam.player2].filter(Boolean);
-        const partner = teamPlayers.find(
-          (p: any) => p.id !== userId && p.duprId !== userId
-        );
+        const partner = teamPlayers.find((p: any) => !isUser(p));
 
         const opponentPlayers = opponentTeam
           ? [opponentTeam.player1, opponentTeam.player2].filter(Boolean)
           : [];
 
-        const games = match.games || [];
-        const scoreStr = games
-          .map((g: any) => `${g.team1Score ?? g.game1 ?? "?"}-${g.team2Score ?? g.game2 ?? "?"}`)
-          .join(", ");
+        // Scores can be on team objects (game1, game2, game3) or in a separate games array
+        let scoreStr = "N/A";
+        if (userTeam && opponentTeam) {
+          const scores: string[] = [];
+          for (const gameKey of ["game1", "game2", "game3"]) {
+            const s1 = userTeam[gameKey];
+            const s2 = opponentTeam[gameKey];
+            if (s1 != null && s2 != null) {
+              scores.push(`${s1}-${s2}`);
+            }
+          }
+          if (scores.length > 0) scoreStr = scores.join(", ");
+        }
+        if (scoreStr === "N/A" && match.games?.length > 0) {
+          scoreStr = match.games
+            .map((g: any) => `${g.team1Score ?? g.game1 ?? "?"}-${g.team2Score ?? g.game2 ?? "?"}`)
+            .join(", ");
+        }
 
         return {
           matchId: match.matchId || match.id || "",

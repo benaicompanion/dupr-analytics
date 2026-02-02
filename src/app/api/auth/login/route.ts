@@ -25,13 +25,22 @@ export async function POST(req: NextRequest) {
     const profileData = await getProfile(token);
     const user = profileData?.result || {};
 
+    // Log the raw profile for debugging
+    console.log("[DUPR Login] Raw profile keys:", Object.keys(user));
+    console.log("[DUPR Login] id:", user.id, "duprId:", user.duprId, "fullName:", user.fullName);
+    console.log("[DUPR Login] ratings - doubles:", user.doubles, "doublesRating:", user.doublesRating);
+
+    // Try multiple possible rating fields
+    const doublesRating = user.doubles ?? user.doublesRating ?? user.ratings?.doubles ?? null;
+    const singlesRating = user.singles ?? user.singlesRating ?? user.ratings?.singles ?? null;
+
     await setAuthCookies(token, {
       id: user.id,
       duprId: user.duprId,
       fullName: user.fullName,
       email: user.email,
-      doublesRating: user.doubles,
-      singlesRating: user.singles,
+      doublesRating,
+      singlesRating,
       imageUrl: user.imageUrl,
     });
 
@@ -41,8 +50,8 @@ export async function POST(req: NextRequest) {
         id: user.id,
         duprId: user.duprId,
         fullName: user.fullName,
-        doublesRating: user.doubles,
-        singlesRating: user.singles,
+        doublesRating,
+        singlesRating,
         imageUrl: user.imageUrl,
       },
     });
