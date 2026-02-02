@@ -67,7 +67,7 @@ export async function getMatchHistory(
 export async function getAllMatchHistory(token: string, playerId: number) {
   const allHits: unknown[] = [];
   let offset = 0;
-  const limit = 200; // Fetch more per page to reduce round trips
+  const limit = 100; // DUPR API max is 100
   let total = Infinity;
 
   while (offset < total) {

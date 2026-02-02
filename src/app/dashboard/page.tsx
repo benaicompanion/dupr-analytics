@@ -50,30 +50,48 @@ export default function DashboardPage() {
     init();
   }, [router]);
 
+  async function fetchAllMatches(playerId: number): Promise<any[]> {
+    const allMatches: any[] = [];
+    let offset = 0;
+    const limit = 100;
+    let hasMore = true;
+
+    while (hasMore) {
+      const res = await fetch(`/api/player/${playerId}/history?offset=${offset}&limit=${limit}`);
+      const data = await res.json();
+      if (data.error) {
+        console.error("History page error:", data.error);
+        break;
+      }
+      const hits = data.matches || [];
+      allMatches.push(...hits);
+      hasMore = data.hasMore === true;
+      offset += limit;
+    }
+
+    return allMatches;
+  }
+
   async function loadPlayerData(playerId: number) {
     setLoading(true);
     setError("");
     try {
-      const [historyRes, doublesRatingRes, singlesRatingRes] = await Promise.all([
-        fetch(`/api/player/${playerId}/history`),
+      // Fetch rating histories in parallel, then paginate match history
+      const [doublesRatingRes, singlesRatingRes] = await Promise.all([
         fetch(`/api/player/${playerId}/rating-history?type=DOUBLES`),
         fetch(`/api/player/${playerId}/rating-history?type=SINGLES`),
       ]);
 
-      const historyData = await historyRes.json();
       const doublesRatingData = await doublesRatingRes.json();
       const singlesRatingData = await singlesRatingRes.json();
 
-      if (historyData.error) {
-        console.error("History error:", historyData.error);
-        setError(`Match history: ${historyData.error}`);
-      }
-
-      const matchList = historyData.matches || [];
-      console.log(`Loaded ${matchList.length} matches for player ${playerId}`);
-      setMatches(matchList);
       setDoublesRatingHistory(doublesRatingData?.result?.ratingHistory || []);
       setSinglesRatingHistory(singlesRatingData?.result?.ratingHistory || []);
+
+      // Paginate match history client-side to avoid server timeout
+      const allMatches = await fetchAllMatches(playerId);
+      console.log(`Loaded ${allMatches.length} total matches for player ${playerId}`);
+      setMatches(allMatches);
     } catch (err) {
       console.error("Failed to load player data:", err);
       setError("Failed to load player data");
