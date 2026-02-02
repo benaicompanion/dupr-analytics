@@ -227,6 +227,8 @@ export default function DashboardPage() {
               <PartnerTable
                 partners={partners.slice(0, 10)}
                 onPlayerClick={handlePlayerSelect}
+                title="Top 10 Partners by DUPR Impact"
+                totalCount={partners.length}
               />
               <MatchHistory matches={processedMatches.slice(0, 10)} />
             </div>

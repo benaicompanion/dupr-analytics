@@ -26,9 +26,13 @@ interface PartnerStats {
 export function PartnerTable({
   partners,
   onPlayerClick,
+  title,
+  totalCount,
 }: {
   partners: PartnerStats[];
   onPlayerClick?: (id: number) => void;
+  title?: string;
+  totalCount?: number;
 }) {
   if (partners.length === 0) {
     return (
@@ -48,7 +52,14 @@ export function PartnerTable({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Doubles Partner Analysis</CardTitle>
+        <CardTitle>
+          {title || "Doubles Partner Analysis"}
+          {totalCount && totalCount > partners.length && (
+            <span className="text-sm font-normal text-muted-foreground ml-2">
+              (showing {partners.length} of {totalCount})
+            </span>
+          )}
+        </CardTitle>
         <p className="text-sm text-muted-foreground">Sorted by DUPR impact (best to worst)</p>
       </CardHeader>
       <CardContent>
