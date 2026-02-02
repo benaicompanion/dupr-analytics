@@ -58,16 +58,27 @@ export default function DashboardPage() {
     let hasMore = true;
 
     while (hasMore) {
-      const res = await fetch(`/api/player/${playerId}/history?offset=${offset}&limit=${limit}`);
-      const data = await res.json();
-      if (data.error) {
-        console.error("History page error:", data.error);
+      try {
+        const url = `/api/player/${playerId}/history?offset=${offset}&limit=${limit}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          const errText = await res.text();
+          setError(`Fetch failed (${res.status}): ${errText}`);
+          break;
+        }
+        const data = await res.json();
+        if (data.error) {
+          setError(`Match history error: ${data.error}`);
+          break;
+        }
+        const hits = data.matches || [];
+        allMatches.push(...hits);
+        hasMore = data.hasMore === true;
+        offset += limit;
+      } catch (err: any) {
+        setError(`Fetch exception: ${err?.message || String(err)}`);
         break;
       }
-      const hits = data.matches || [];
-      allMatches.push(...hits);
-      hasMore = data.hasMore === true;
-      offset += limit;
     }
 
     return allMatches;
