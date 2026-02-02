@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [rawMatchCount, setRawMatchCount] = useState(0);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -91,6 +92,7 @@ export default function DashboardPage() {
       // Paginate match history client-side to avoid server timeout
       const allMatches = await fetchAllMatches(playerId);
       console.log(`Loaded ${allMatches.length} total matches for player ${playerId}`);
+      setRawMatchCount(allMatches.length);
       setMatches(allMatches);
     } catch (err) {
       console.error("Failed to load player data:", err);
@@ -193,6 +195,16 @@ export default function DashboardPage() {
           <p className="text-muted-foreground">
             Your pickleball analytics dashboard
           </p>
+          {rawMatchCount > 0 && processedMatches.length === 0 && (
+            <div className="mt-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-yellow-400 text-sm">
+              Debug: Loaded {rawMatchCount} raw matches but processed 0. User ID: {userId} (type: {typeof userId})
+            </div>
+          )}
+          {rawMatchCount === 0 && !loading && (
+            <div className="mt-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-yellow-400 text-sm">
+              Debug: No matches loaded from API. Check network tab for errors.
+            </div>
+          )}
         </div>
 
         <SummaryStats stats={summary} singlesRating={latestSinglesRating} />
