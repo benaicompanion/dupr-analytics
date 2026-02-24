@@ -96,6 +96,15 @@ export default function LoginPage() {
             Your credentials are sent directly to DUPR and never stored.
             <br />
             Only your session token is kept in a secure HTTP-only cookie.
+            <br />
+            <a
+              href="https://github.com/benaicompanion/dupr-analytics"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground"
+            >
+              Verify for yourself — view the source code
+            </a>
           </p>
         </CardContent>
       </Card>
